@@ -82,3 +82,30 @@ export interface CommunityMutationResult {
   membershipId?: string;
   status: CommunityStatus;
 }
+
+export interface CommunityConfiguration {
+  communityId: string;
+  communityConfig: CommunityConfig;
+  brandingConfig: BrandingConfig;
+  terminologyConfig: TerminologyConfig;
+}
+
+export interface UpdateCommunityConfigurationInput {
+  communityId: string;
+  communityConfig?: Partial<
+    Pick<CommunityConfig, "timezone" | "locale" | "fiscalYearStartMonth">
+  >;
+  brandingConfig?: Partial<
+    Pick<BrandingConfig, "displayName" | "logoUrl" | "primaryColor">
+  >;
+  terminologyConfig?: {
+    labels?: Partial<TerminologyLabels>;
+    hierarchyDepth?: number;
+    usesFloors?: boolean;
+  };
+}
+
+export interface CommunityConfigurationMutationResult {
+  communityId: string;
+  status: "updated";
+}

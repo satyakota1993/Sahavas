@@ -19,7 +19,7 @@ export const defaultTerminologyLabels: TerminologyLabels = {
   amenity: "Amenity",
 };
 
-function normalizeLabels(value: unknown): TerminologyLabels {
+export function normalizeTerminologyLabels(value: unknown): TerminologyLabels {
   if (!value || typeof value !== "object") {
     return defaultTerminologyLabels;
   }
@@ -66,7 +66,7 @@ export async function getTerminologyConfig(
   return {
     communityId,
     configId: snapshot.id,
-    labels: normalizeLabels(data.labels),
+    labels: normalizeTerminologyLabels(data.labels),
     hierarchyDepth:
       typeof data.hierarchyDepth === "number" ? data.hierarchyDepth : 1,
     usesFloors: typeof data.usesFloors === "boolean" ? data.usesFloors : true,

@@ -28,16 +28,43 @@ interface UpdateCommunityPayload {
   status?: unknown;
 }
 
+interface UpdateCommunityConfigurationPayload {
+  communityId?: unknown;
+  communityConfig?: unknown;
+  brandingConfig?: unknown;
+  terminologyConfig?: unknown;
+}
+
 interface CommunityMutationResponse {
   communityId: string;
   membershipId?: string;
   status: "trial" | "active" | "suspended" | "archived";
 }
 
+interface CommunityConfigurationMutationResponse {
+  communityId: string;
+  status: "updated";
+}
+
 const callableOptions = {
   region: "asia-south1",
   enforceAppCheck: true,
 };
+
+const terminologyLabelKeys = [
+  "community",
+  "propertyGroup",
+  "subGroup",
+  "floor",
+  "unit",
+  "resident",
+  "owner",
+  "tenant",
+  "committee",
+  "parkingSpace",
+  "facility",
+  "amenity",
+] as const;
 
 function requiredText(value: unknown, fieldName: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -51,6 +78,101 @@ function optionalText(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : null;
+}
+
+function optionalObject(value: unknown, fieldName: string): Record<string, unknown> | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", `${fieldName} must be an object.`);
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function hasField(source: Record<string, unknown>, fieldName: string): boolean {
+  return Object.prototype.hasOwnProperty.call(source, fieldName);
+}
+
+function textPatch(
+  source: Record<string, unknown>,
+  fieldName: string,
+  maxLength: number,
+  options: { allowClear?: boolean; requiredWhenPresent?: boolean } = {},
+): string | FirebaseFirestore.FieldValue | undefined {
+  if (!hasField(source, fieldName)) {
+    return undefined;
+  }
+
+  const value = source[fieldName];
+
+  if (typeof value !== "string") {
+    throw new HttpsError("invalid-argument", `${fieldName} must be text.`);
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    if (options.allowClear) {
+      return FieldValue.delete();
+    }
+
+    if (options.requiredWhenPresent) {
+      throw new HttpsError("invalid-argument", `${fieldName} cannot be empty.`);
+    }
+
+    return undefined;
+  }
+
+  if (trimmed.length > maxLength) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} must be ${maxLength} characters or less.`,
+    );
+  }
+
+  return trimmed;
+}
+
+function integerPatch(
+  source: Record<string, unknown>,
+  fieldName: string,
+  min: number,
+  max: number,
+): number | undefined {
+  if (!hasField(source, fieldName)) {
+    return undefined;
+  }
+
+  const value = source[fieldName];
+
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} must be an integer between ${min} and ${max}.`,
+    );
+  }
+
+  return value;
+}
+
+function booleanPatch(
+  source: Record<string, unknown>,
+  fieldName: string,
+): boolean | undefined {
+  if (!hasField(source, fieldName)) {
+    return undefined;
+  }
+
+  const value = source[fieldName];
+
+  if (typeof value !== "boolean") {
+    throw new HttpsError("invalid-argument", `${fieldName} must be true or false.`);
+  }
+
+  return value;
 }
 
 function validateCommunityId(communityId: string): void {
@@ -301,6 +423,236 @@ export const updateCommunity = onCall<UpdateCommunityPayload>(
         request.data?.status === "archived"
           ? request.data.status
           : "trial",
+    };
+  },
+);
+
+export const updateCommunityConfiguration = onCall<UpdateCommunityConfigurationPayload>(
+  callableOptions,
+  async (request): Promise<CommunityConfigurationMutationResponse> => {
+    const actor = requireAuth(request);
+    const communityId = requiredText(request.data?.communityId, "communityId");
+    validateCommunityId(communityId);
+    await assertCanManageCommunity(communityId, actor.uid, "communities.update");
+
+    const communityConfigPayload = optionalObject(
+      request.data?.communityConfig,
+      "communityConfig",
+    );
+    const brandingConfigPayload = optionalObject(
+      request.data?.brandingConfig,
+      "brandingConfig",
+    );
+    const terminologyConfigPayload = optionalObject(
+      request.data?.terminologyConfig,
+      "terminologyConfig",
+    );
+
+    const communityConfigUpdate: Record<string, unknown> = {};
+    const brandingConfigUpdate: Record<string, unknown> = {};
+    const terminologyConfigUpdate: Record<string, unknown> = {};
+    const changedFields: string[] = [];
+
+    if (communityConfigPayload) {
+      const timezone = textPatch(communityConfigPayload, "timezone", 80, {
+        requiredWhenPresent: true,
+      });
+      const locale = textPatch(communityConfigPayload, "locale", 20, {
+        requiredWhenPresent: true,
+      });
+      const fiscalYearStartMonth = integerPatch(
+        communityConfigPayload,
+        "fiscalYearStartMonth",
+        1,
+        12,
+      );
+
+      if (timezone !== undefined) {
+        communityConfigUpdate.timezone = timezone;
+        changedFields.push("communityConfig.timezone");
+      }
+
+      if (locale !== undefined) {
+        communityConfigUpdate.locale = locale;
+        changedFields.push("communityConfig.locale");
+      }
+
+      if (fiscalYearStartMonth !== undefined) {
+        communityConfigUpdate.fiscalYearStartMonth = fiscalYearStartMonth;
+        changedFields.push("communityConfig.fiscalYearStartMonth");
+      }
+    }
+
+    if (brandingConfigPayload) {
+      const displayName = textPatch(brandingConfigPayload, "displayName", 120, {
+        requiredWhenPresent: true,
+      });
+      const logoUrl = textPatch(brandingConfigPayload, "logoUrl", 500, {
+        allowClear: true,
+      });
+      const primaryColor = textPatch(brandingConfigPayload, "primaryColor", 7, {
+        allowClear: true,
+      });
+
+      if (displayName !== undefined) {
+        brandingConfigUpdate.displayName = displayName;
+        changedFields.push("brandingConfig.displayName");
+      }
+
+      if (typeof logoUrl === "string" && !/^https?:\/\//i.test(logoUrl)) {
+        throw new HttpsError("invalid-argument", "logoUrl must be a valid web URL.");
+      }
+
+      if (logoUrl !== undefined) {
+        brandingConfigUpdate.logoUrl = logoUrl;
+        changedFields.push("brandingConfig.logoUrl");
+      }
+
+      if (
+        typeof primaryColor === "string" &&
+        !/^#[0-9A-Fa-f]{6}$/.test(primaryColor)
+      ) {
+        throw new HttpsError("invalid-argument", "primaryColor must be a hex color.");
+      }
+
+      if (primaryColor !== undefined) {
+        brandingConfigUpdate.primaryColor = primaryColor;
+        changedFields.push("brandingConfig.primaryColor");
+      }
+    }
+
+    if (terminologyConfigPayload) {
+      const hierarchyDepth = integerPatch(
+        terminologyConfigPayload,
+        "hierarchyDepth",
+        1,
+        6,
+      );
+      const usesFloors = booleanPatch(terminologyConfigPayload, "usesFloors");
+      const labelsPayload = optionalObject(terminologyConfigPayload.labels, "labels");
+      const labelsUpdate: Record<string, string> = {};
+
+      if (hierarchyDepth !== undefined) {
+        terminologyConfigUpdate.hierarchyDepth = hierarchyDepth;
+        changedFields.push("terminologyConfig.hierarchyDepth");
+      }
+
+      if (usesFloors !== undefined) {
+        terminologyConfigUpdate.usesFloors = usesFloors;
+        changedFields.push("terminologyConfig.usesFloors");
+      }
+
+      if (labelsPayload) {
+        for (const labelKey of terminologyLabelKeys) {
+          const label = textPatch(labelsPayload, labelKey, 40, {
+            requiredWhenPresent: true,
+          });
+
+          if (typeof label === "string") {
+            labelsUpdate[labelKey] = label;
+            changedFields.push(`terminologyConfig.labels.${labelKey}`);
+          }
+        }
+      }
+
+      if (Object.keys(labelsUpdate).length > 0) {
+        terminologyConfigUpdate.labels = labelsUpdate;
+      }
+    }
+
+    if (changedFields.length === 0) {
+      throw new HttpsError("invalid-argument", "At least one configuration field is required.");
+    }
+
+    const db = getFirestore();
+    const communityRef = db.collection("communities").doc(communityId);
+    const communityConfigRef = communityRef.collection("community_configs").doc("default");
+    const brandingConfigRef = communityRef.collection("branding_configs").doc("default");
+    const terminologyConfigRef = communityRef
+      .collection("terminology_configs")
+      .doc("default");
+
+    await db.runTransaction(async (transaction) => {
+      const [
+        communitySnapshot,
+        communityConfigSnapshot,
+        brandingConfigSnapshot,
+        terminologyConfigSnapshot,
+      ] = await Promise.all([
+        transaction.get(communityRef),
+        transaction.get(communityConfigRef),
+        transaction.get(brandingConfigRef),
+        transaction.get(terminologyConfigRef),
+      ]);
+
+      if (!communitySnapshot.exists) {
+        throw new HttpsError("not-found", "Community was not found.");
+      }
+
+      if (Object.keys(communityConfigUpdate).length > 0) {
+        transaction.set(
+          communityConfigRef,
+          {
+            communityId,
+            group: "default",
+            ...(communityConfigSnapshot.exists
+              ? {}
+              : { createdAt: FieldValue.serverTimestamp() }),
+            ...communityConfigUpdate,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+
+      if (Object.keys(brandingConfigUpdate).length > 0) {
+        transaction.set(
+          brandingConfigRef,
+          {
+            communityId,
+            configId: "default",
+            ...(brandingConfigSnapshot.exists
+              ? {}
+              : { createdAt: FieldValue.serverTimestamp() }),
+            ...brandingConfigUpdate,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+
+      if (Object.keys(terminologyConfigUpdate).length > 0) {
+        transaction.set(
+          terminologyConfigRef,
+          {
+            communityId,
+            configId: "default",
+            ...(terminologyConfigSnapshot.exists
+              ? {}
+              : { createdAt: FieldValue.serverTimestamp() }),
+            ...terminologyConfigUpdate,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+
+      writeSocietyAuditLog(transaction, {
+        societyId: communityId,
+        actorId: actor.uid,
+        actorEmail: actor.email,
+        action: "community.configurationUpdated",
+        resourceType: "communityConfiguration",
+        resourceId: communityId,
+        metadata: {
+          fields: changedFields.join(","),
+        },
+      });
+    });
+
+    return {
+      communityId,
+      status: "updated",
     };
   },
 );

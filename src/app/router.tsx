@@ -8,8 +8,10 @@ import { LegalPage } from "@/features/auth/pages/LegalPage";
 import { PasswordResetPage } from "@/features/auth/pages/PasswordResetPage";
 import { UnauthorizedPage } from "@/features/auth/pages/UnauthorizedPage";
 import { VerifyEmailPage } from "@/features/auth/pages/VerifyEmailPage";
+import { CommunityConfigurationPage } from "@/features/community-configuration/pages/CommunityConfigurationPage";
 import { HomeDashboardPage } from "@/features/dashboard/pages/HomeDashboardPage";
 import { SocietySelectionPage } from "@/features/society-selection/pages/SocietySelectionPage";
+import { PermissionRoute } from "@/routes/PermissionRoute";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { SocietyRoute } from "@/routes/SocietyRoute";
 
@@ -68,6 +70,15 @@ export const router = createBrowserRouter([
               {
                 index: true,
                 element: <HomeDashboardPage />,
+              },
+              {
+                element: <PermissionRoute permission="communities.update" />,
+                children: [
+                  {
+                    path: "configuration",
+                    element: <CommunityConfigurationPage />,
+                  },
+                ],
               },
             ],
           },

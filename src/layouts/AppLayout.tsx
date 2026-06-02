@@ -1,23 +1,45 @@
-import { Building2, LayoutDashboard, LogOut, UsersRound } from "lucide-react";
+import {
+  Building2,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/providers/AuthProvider";
 import { useSocietySession } from "@/providers/SocietyProvider";
+import type { Permission } from "@/types/roles";
 
-const appNavigation = [
+const appNavigation: Array<{
+  label: string;
+  to: string;
+  icon: LucideIcon;
+  permission?: Permission;
+}> = [
   {
     label: "Dashboard",
     to: "/app",
     icon: LayoutDashboard,
   },
+  {
+    label: "Configuration",
+    to: "/app/configuration",
+    icon: Settings,
+    permission: "communities.update",
+  },
 ];
 
 export function AppLayout() {
   const { profile, signOut } = useAuth();
-  const { activeMembership } = useSocietySession();
+  const { activeMembership, roleContext } = useSocietySession();
   const societyName = activeMembership?.society?.name ?? "Selected society";
+  const navigation = appNavigation.filter(
+    (item) => !item.permission || roleContext?.can(item.permission),
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -52,13 +74,14 @@ export function AppLayout() {
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8">
         <aside className="lg:sticky lg:top-24 lg:h-fit">
           <nav className="flex gap-2 overflow-x-auto lg:flex-col">
-            {appNavigation.map((item) => {
+            {navigation.map((item) => {
               const Icon = item.icon;
 
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  end={item.to === "/app"}
                   className={({ isActive }) =>
                     [
                       "flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
