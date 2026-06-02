@@ -21,7 +21,7 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     emailVerified: user.emailVerified,
     phoneVerified: Boolean(user.phoneNumber),
     linkedProviders: providerIdsFor(user),
-    status: "active",
+    status: user.emailVerified ? "ACTIVE" : "EMAIL_PENDING_VERIFICATION",
     updatedAt: serverTimestamp(),
     lastLoginAt: serverTimestamp(),
   };

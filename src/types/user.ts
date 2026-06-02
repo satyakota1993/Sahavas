@@ -1,6 +1,12 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type UserProfileStatus = "active" | "pending" | "disabled";
+export type UserProfileStatus =
+  | "ACTIVE"
+  | "EMAIL_PENDING_VERIFICATION"
+  | "DISABLED"
+  | "active"
+  | "pending"
+  | "disabled";
 
 export interface UserProfile {
   uid: string;

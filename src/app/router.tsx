@@ -4,7 +4,10 @@ import { AuthLayout } from "@/layouts/AuthLayout";
 import { AppLayout } from "@/layouts/AppLayout";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { InviteLoginPage } from "@/features/auth/pages/InviteLoginPage";
+import { LegalPage } from "@/features/auth/pages/LegalPage";
+import { PasswordResetPage } from "@/features/auth/pages/PasswordResetPage";
 import { UnauthorizedPage } from "@/features/auth/pages/UnauthorizedPage";
+import { VerifyEmailPage } from "@/features/auth/pages/VerifyEmailPage";
 import { HomeDashboardPage } from "@/features/dashboard/pages/HomeDashboardPage";
 import { SocietySelectionPage } from "@/features/society-selection/pages/SocietySelectionPage";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
@@ -27,8 +30,24 @@ export const router = createBrowserRouter([
         element: <InviteLoginPage />,
       },
       {
+        path: "/reset-password",
+        element: <PasswordResetPage />,
+      },
+      {
+        path: "/verify-email",
+        element: <VerifyEmailPage />,
+      },
+      {
         path: "/unauthorized",
         element: <UnauthorizedPage />,
+      },
+      {
+        path: "/privacy",
+        element: <LegalPage />,
+      },
+      {
+        path: "/terms",
+        element: <LegalPage />,
       },
     ],
   },

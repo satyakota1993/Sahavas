@@ -1,4 +1,5 @@
 import type { MembershipWithSociety, RoleContext } from "@/types/membership";
+import { rolesHavePermission, type Permission } from "@/types/roles";
 
 export function resolveRoleContext(
   userId: string,
@@ -21,8 +22,10 @@ export function resolveRoleContext(
     capabilities: activeMembership.capabilities,
     activeMembership,
     can: (capability: string) =>
-      activeMembership.capabilities["*"] === true ||
-      activeMembership.capabilities[capability] === true ||
-      activeMembership.roles.includes("superAdmin"),
+      rolesHavePermission(
+        activeMembership.roles,
+        capability as Permission,
+        activeMembership.capabilities,
+      ),
   };
 }

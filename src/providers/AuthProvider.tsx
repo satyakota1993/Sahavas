@@ -1,4 +1,4 @@
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
 import {
   createContext,
   useCallback,
@@ -11,7 +11,7 @@ import {
 
 import { firebaseConfigReady } from "@/firebase/config";
 import { getFirebaseAuth } from "@/firebase/auth";
-import { signOutUser } from "@/services/auth.service";
+import { EMAIL_NOT_VERIFIED_MESSAGE, signOutUser } from "@/services/auth.service";
 import { ensureUserProfile, getUserProfile } from "@/services/user-profile.service";
 import type { UserProfile } from "@/types/user";
 
@@ -80,6 +80,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const profile = await ensureUserProfile(firebaseUser);
+
+        const requiresEmailVerification =
+          firebaseUser.providerData.some(
+            (provider) => provider.providerId === "password",
+          ) && !firebaseUser.emailVerified;
+
+        if (requiresEmailVerification) {
+          await firebaseSignOut(getFirebaseAuth());
+
+          if (active) {
+            setState({
+              status: "anonymous",
+              user: null,
+              profile: null,
+              error: EMAIL_NOT_VERIFIED_MESSAGE,
+            });
+          }
+
+          return;
+        }
 
         if (active) {
           setState({

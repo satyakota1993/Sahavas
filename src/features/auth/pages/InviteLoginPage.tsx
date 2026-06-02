@@ -23,6 +23,7 @@ import {
   signInWithGoogle as signInGoogle,
 } from "@/services/auth.service";
 import { acceptInvite, getInviteByToken } from "@/services/invite.service";
+import { validatePassword } from "@/services/password-policy";
 
 type EmailMode = "sign-in" | "register";
 
@@ -33,11 +34,14 @@ export function InviteLoginPage() {
   const { user, isAuthenticated } = useAuth();
   const { refreshMemberships } = useSocietySession();
   const [mode, setMode] = useState<EmailMode>("register");
-  const [displayName, setDisplayName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formMessage, setFormMessage] = useState<string | null>(null);
 
   const inviteQuery = useQuery({
     queryKey: ["societyInvite", societyId, token],
@@ -78,7 +82,20 @@ export function InviteLoginPage() {
 
     try {
       if (mode === "register") {
-        await registerWithEmail({ displayName, email, password });
+        const passwordResult = validatePassword(password);
+
+        if (!passwordResult.valid) {
+          setFormError(passwordResult.errors[0]);
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          setFormError("Password and confirm password must match.");
+          return;
+        }
+
+        await registerWithEmail({ firstName, lastName, email, password });
+        setFormMessage("Account created. Verify your email, then sign in to accept the invite.");
       } else {
         await signInWithEmail({ email, password });
       }
@@ -137,6 +154,12 @@ export function InviteLoginPage() {
             <AlertDescription>{formError}</AlertDescription>
           </Alert>
         )}
+        {formMessage && (
+          <Alert className="border-emerald-200 bg-emerald-50">
+            <AlertTitle>Done</AlertTitle>
+            <AlertDescription>{formMessage}</AlertDescription>
+          </Alert>
+        )}
         {invite && (
           <div className="rounded-lg border border-border bg-muted/50 p-4">
             <div className="mb-3 flex flex-wrap gap-2">
@@ -175,15 +198,27 @@ export function InviteLoginPage() {
             </Button>
             <form className="space-y-4" onSubmit={(event) => void handleEmailSubmit(event)}>
               {mode === "register" && (
-                <div className="space-y-2">
-                  <Label htmlFor="inviteDisplayName">Full name</Label>
-                  <Input
-                    id="inviteDisplayName"
-                    autoComplete="name"
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    required
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="inviteFirstName">First Name</Label>
+                    <Input
+                      id="inviteFirstName"
+                      autoComplete="given-name"
+                      value={firstName}
+                      onChange={(event) => setFirstName(event.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="inviteLastName">Last Name</Label>
+                    <Input
+                      id="inviteLastName"
+                      autoComplete="family-name"
+                      value={lastName}
+                      onChange={(event) => setLastName(event.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
               )}
               <div className="space-y-2">
@@ -209,6 +244,20 @@ export function InviteLoginPage() {
                   minLength={8}
                 />
               </div>
+              {mode === "register" && (
+                <div className="space-y-2">
+                  <Label htmlFor="inviteConfirmPassword">Confirm Password</Label>
+                  <Input
+                    id="inviteConfirmPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={Boolean(busyAction) || !invite}>
                 <Mail className="h-4 w-4" aria-hidden="true" />
                 {mode === "register" ? "Create account" : "Sign in"}

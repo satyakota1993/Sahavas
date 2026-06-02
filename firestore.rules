@@ -1,0 +1,447 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.superAdmin == true ||
+        request.auth.token.platformAdmin == true
+      );
+    }
+
+    function memberPath(societyId, uid) {
+      return /databases/$(database)/documents/societies/$(societyId)/members/$(uid);
+    }
+
+    function communityMemberPath(societyId, uid) {
+      return /databases/$(database)/documents/communities/$(societyId)/members/$(uid);
+    }
+
+    function hasMemberDoc(societyId) {
+      return isSignedIn() && (
+        exists(communityMemberPath(societyId, request.auth.uid)) ||
+        exists(memberPath(societyId, request.auth.uid))
+      );
+    }
+
+    function memberData(societyId) {
+      return exists(communityMemberPath(societyId, request.auth.uid))
+        ? get(communityMemberPath(societyId, request.auth.uid)).data
+        : get(memberPath(societyId, request.auth.uid)).data;
+    }
+
+    function hasActiveMembership(societyId) {
+      return isSuperAdmin() || (
+        hasMemberDoc(societyId) &&
+        memberData(societyId).status == "active"
+      );
+    }
+
+    function hasAnyRole(societyId, roles) {
+      return isSuperAdmin() || (
+        hasActiveMembership(societyId) &&
+        memberData(societyId).roles.hasAny(roles)
+      );
+    }
+
+    function hasCapability(societyId, capability) {
+      return isSuperAdmin() || (
+        hasActiveMembership(societyId) &&
+        (
+          memberData(societyId).capabilities["*"] == true ||
+          memberData(societyId).capabilities[capability] == true
+        )
+      );
+    }
+
+    function isSocietyAdmin(societyId) {
+      return hasAnyRole(societyId, [
+        "communityAdmin",
+        "societyAdmin",
+        "president",
+        "secretary"
+      ]);
+    }
+
+    function isResident(societyId) {
+      return hasAnyRole(societyId, ["owner", "resident", "tenant"]);
+    }
+
+    function isSecurityGuard(societyId) {
+      return hasAnyRole(societyId, ["security", "securityGuard"]);
+    }
+
+    function hasUnitAccess(societyId, unitId) {
+      return hasActiveMembership(societyId) &&
+        unitId in memberData(societyId).unitIds;
+    }
+
+    function isOwnResidentRecord() {
+      return isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (
+          "userIds" in resource.data &&
+          request.auth.uid in resource.data.userIds
+        )
+      );
+    }
+
+    function canReadInvite(societyId) {
+      return isSuperAdmin() ||
+        isSocietyAdmin(societyId) ||
+        hasCapability(societyId, "invites.read") ||
+        (
+          resource.data.status == "pending" &&
+          request.time < resource.data.expiresAt
+        );
+    }
+
+    function userProfileCreateAllowed(uid) {
+      return isSelf(uid) &&
+        request.resource.data.uid == uid &&
+        (
+          (
+            request.auth.token.email_verified == true &&
+            request.resource.data.status in ["ACTIVE", "active"]
+          ) ||
+          (
+            request.auth.token.email_verified != true &&
+            request.resource.data.status in ["EMAIL_PENDING_VERIFICATION", "pending"]
+          )
+        ) &&
+        request.resource.data.keys().hasOnly([
+          "uid",
+          "email",
+          "displayName",
+          "photoURL",
+          "phoneNumber",
+          "emailVerified",
+          "phoneVerified",
+          "linkedProviders",
+          "status",
+          "defaultSocietyId",
+          "createdAt",
+          "updatedAt",
+          "lastLoginAt"
+        ]);
+    }
+
+    function userProfileUpdateAllowed(uid) {
+      return isSelf(uid) &&
+        request.resource.data.uid == resource.data.uid &&
+        (
+          (
+            request.auth.token.email_verified == true &&
+            request.resource.data.status in ["ACTIVE", "active"]
+          ) ||
+          (
+            request.auth.token.email_verified != true &&
+            request.resource.data.status in ["EMAIL_PENDING_VERIFICATION", "pending"]
+          )
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "email",
+          "displayName",
+          "photoURL",
+          "phoneNumber",
+          "emailVerified",
+          "phoneVerified",
+          "linkedProviders",
+          "status",
+          "defaultSocietyId",
+          "updatedAt",
+          "lastLoginAt"
+        ]);
+    }
+
+    match /users/{uid} {
+      allow get: if isSelf(uid) || isSuperAdmin();
+      allow list: if isSuperAdmin();
+      allow create: if userProfileCreateAllowed(uid);
+      allow update: if userProfileUpdateAllowed(uid) || isSuperAdmin();
+      allow delete: if false;
+    }
+
+    match /memberships/{membershipId} {
+      allow get, list: if isSuperAdmin() ||
+        (
+          isSignedIn() &&
+          resource.data.userId == request.auth.uid
+        ) ||
+        isSocietyAdmin(resource.data.societyId) ||
+        hasCapability(resource.data.societyId, "memberships.read");
+      allow create, update, delete: if false;
+    }
+
+    match /community_configs/{communityId} {
+      allow get: if hasActiveMembership(communityId);
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /branding_configs/{communityId} {
+      allow get: if hasActiveMembership(communityId);
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /terminology_configs/{communityId} {
+      allow get: if hasActiveMembership(communityId);
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /communities/{societyId} {
+      allow get: if hasActiveMembership(societyId);
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if false;
+
+      match /members/{memberId} {
+        allow get: if isSelf(memberId) ||
+          isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "members.read");
+        allow list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "members.read");
+        allow create, update, delete: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow get: if canReadInvite(societyId);
+        allow list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "invites.read");
+        allow create, update, delete: if false;
+      }
+
+      match /residents/{residentId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "residents.read") ||
+          isOwnResidentRecord();
+        allow create, update, delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "residents.write");
+      }
+
+      match /visitors/{visitorId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          isSecurityGuard(societyId) ||
+          hasCapability(societyId, "visitors.read") ||
+          (
+            isSignedIn() &&
+            (
+              resource.data.hostUserId == request.auth.uid ||
+              resource.data.createdBy == request.auth.uid
+            )
+          );
+        allow create: if hasActiveMembership(societyId) &&
+          request.resource.data.communityId == societyId &&
+          (
+            isSocietyAdmin(societyId) ||
+            isSecurityGuard(societyId) ||
+            hasCapability(societyId, "visitors.write") ||
+            (
+              isResident(societyId) &&
+              request.resource.data.hostUserId == request.auth.uid &&
+              request.resource.data.createdBy == request.auth.uid
+            )
+          );
+        allow update: if isSocietyAdmin(societyId) ||
+          isSecurityGuard(societyId) ||
+          hasCapability(societyId, "visitors.write");
+        allow delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "visitors.delete");
+      }
+
+      match /complaints/{complaintId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "complaints.read") ||
+          (
+            isSignedIn() &&
+            (
+              resource.data.createdBy == request.auth.uid ||
+              resource.data.raisedBy == request.auth.uid ||
+              resource.data.assignedTo == request.auth.uid
+            )
+          );
+        allow create: if hasActiveMembership(societyId) &&
+          request.resource.data.communityId == societyId &&
+          (
+            request.resource.data.createdBy == request.auth.uid ||
+            request.resource.data.raisedBy == request.auth.uid
+          );
+        allow update: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "complaints.write");
+        allow delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "complaints.delete");
+      }
+
+      match /notices/{noticeId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "notices.read") ||
+          (
+            hasActiveMembership(societyId) &&
+            resource.data.status == "published"
+          );
+        allow create, update, delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "notices.write");
+      }
+
+      match /maintenanceBills/{billId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "maintenance.read") ||
+          (
+            isSignedIn() &&
+            (
+              resource.data.userId == request.auth.uid ||
+              hasUnitAccess(societyId, resource.data.unitId)
+            )
+          );
+        allow create, update, delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "maintenance.write");
+      }
+
+      match /auditLogs/{auditId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "audit.read");
+        allow create, update, delete: if false;
+      }
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /societies/{societyId} {
+      allow get: if hasActiveMembership(societyId);
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if false;
+
+      match /members/{memberId} {
+        allow get: if isSelf(memberId) ||
+          isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "members.read");
+        allow list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "members.read");
+        allow create, update, delete: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow get: if canReadInvite(societyId);
+        allow list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "invites.read");
+        allow create, update, delete: if false;
+      }
+
+      match /residents/{residentId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "residents.read") ||
+          isOwnResidentRecord();
+        allow create, update, delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "residents.write");
+      }
+
+      match /visitors/{visitorId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          isSecurityGuard(societyId) ||
+          hasCapability(societyId, "visitors.read") ||
+          (
+            isSignedIn() &&
+            (
+              resource.data.hostUserId == request.auth.uid ||
+              resource.data.createdBy == request.auth.uid
+            )
+          );
+        allow create: if hasActiveMembership(societyId) &&
+          request.resource.data.societyId == societyId &&
+          (
+            isSocietyAdmin(societyId) ||
+            isSecurityGuard(societyId) ||
+            hasCapability(societyId, "visitors.write") ||
+            (
+              isResident(societyId) &&
+              request.resource.data.hostUserId == request.auth.uid &&
+              request.resource.data.createdBy == request.auth.uid
+            )
+          );
+        allow update: if isSocietyAdmin(societyId) ||
+          isSecurityGuard(societyId) ||
+          hasCapability(societyId, "visitors.write");
+        allow delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "visitors.delete");
+      }
+
+      match /complaints/{complaintId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "complaints.read") ||
+          (
+            isSignedIn() &&
+            (
+              resource.data.createdBy == request.auth.uid ||
+              resource.data.raisedBy == request.auth.uid ||
+              resource.data.assignedTo == request.auth.uid
+            )
+          );
+        allow create: if hasActiveMembership(societyId) &&
+          request.resource.data.societyId == societyId &&
+          (
+            request.resource.data.createdBy == request.auth.uid ||
+            request.resource.data.raisedBy == request.auth.uid
+          );
+        allow update: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "complaints.write");
+        allow delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "complaints.delete");
+      }
+
+      match /notices/{noticeId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "notices.read") ||
+          (
+            hasActiveMembership(societyId) &&
+            resource.data.status == "published"
+          );
+        allow create, update, delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "notices.write");
+      }
+
+      match /maintenanceBills/{billId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "maintenance.read") ||
+          (
+            isSignedIn() &&
+            (
+              resource.data.userId == request.auth.uid ||
+              hasUnitAccess(societyId, resource.data.unitId)
+            )
+          );
+        allow create, update, delete: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "maintenance.write");
+      }
+
+      match /auditLogs/{auditId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "audit.read");
+        allow create, update, delete: if false;
+      }
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /platformAuditLogs/{auditId} {
+      allow get, list: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

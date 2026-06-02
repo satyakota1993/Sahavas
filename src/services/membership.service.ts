@@ -34,7 +34,7 @@ function normalizeMembership(snapshot: QueryDocumentSnapshot<DocumentData>): Mem
   return {
     id: snapshot.id,
     userId: data.userId,
-    societyId: data.societyId,
+    societyId: data.communityId ?? data.societyId,
     roles,
     primaryRole: data.primaryRole ?? roles[0],
     capabilities: data.capabilities ?? {},
@@ -49,7 +49,11 @@ function normalizeMembership(snapshot: QueryDocumentSnapshot<DocumentData>): Mem
 }
 
 async function getSocietyById(societyId: string): Promise<Society | null> {
-  const snapshot = await getDoc(doc(getFirestoreDb(), firestorePaths.society(societyId)));
+  let snapshot = await getDoc(doc(getFirestoreDb(), firestorePaths.community(societyId)));
+
+  if (!snapshot.exists()) {
+    snapshot = await getDoc(doc(getFirestoreDb(), firestorePaths.society(societyId)));
+  }
 
   if (!snapshot.exists()) {
     return null;

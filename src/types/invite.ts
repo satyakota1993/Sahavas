@@ -21,11 +21,16 @@ export interface SocietyInvite {
 }
 
 export interface AcceptInvitePayload {
+  communityId?: string;
   societyId: string;
   token: string;
 }
 
 export interface AcceptInviteResult {
+  communityId?: string;
   societyId: string;
   membershipId: string;
+  status?: "accepted" | "already-member";
+  roles?: UserRole[];
+  primaryRole?: UserRole;
 }
