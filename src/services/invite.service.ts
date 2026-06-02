@@ -52,9 +52,15 @@ export async function getInviteByToken(
   token: string,
 ): Promise<SocietyInvite> {
   const tokenHash = await hashInviteToken(token);
-  const inviteSnapshot = await getDoc(
-    doc(getFirestoreDb(), firestorePaths.societyInvite(societyId, tokenHash)),
+  let inviteSnapshot = await getDoc(
+    doc(getFirestoreDb(), firestorePaths.communityInvite(societyId, tokenHash)),
   );
+
+  if (!inviteSnapshot.exists()) {
+    inviteSnapshot = await getDoc(
+      doc(getFirestoreDb(), firestorePaths.societyInvite(societyId, tokenHash)),
+    );
+  }
 
   if (!inviteSnapshot.exists()) {
     throw new Error("Invite link was not found.");
@@ -63,6 +69,7 @@ export async function getInviteByToken(
   const data = inviteSnapshot.data();
   const invite: SocietyInvite = {
     id: inviteSnapshot.id,
+    communityId: data.communityId ?? societyId,
     societyId,
     email: data.email,
     phoneNumber: data.phoneNumber,
@@ -88,6 +95,9 @@ export async function acceptInvite(
     getFirebaseFunctions(),
     "acceptInvite",
   );
-  const result = await callable(payload);
+  const result = await callable({
+    ...payload,
+    communityId: payload.communityId ?? payload.societyId,
+  });
   return result.data;
 }

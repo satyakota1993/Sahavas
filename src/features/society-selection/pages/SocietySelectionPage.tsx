@@ -84,6 +84,8 @@ export function SocietySelectionPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {memberships.map((membership) => {
               const isActive = membership.societyId === activeSocietyId;
+              const residenceLabel =
+                membership.society?.terminologyLabels?.unit ?? "Residence";
 
               return (
                 <Card key={membership.id} className={isActive ? "border-primary" : ""}>
@@ -122,7 +124,7 @@ export function SocietySelectionPage() {
                       ))}
                       {membership.unitIds.map((unitId) => (
                         <Badge key={unitId} variant="outline">
-                          Unit {unitId}
+                          {residenceLabel} {unitId}
                         </Badge>
                       ))}
                     </div>

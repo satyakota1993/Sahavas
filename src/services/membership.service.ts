@@ -14,6 +14,7 @@ import { firestorePaths } from "@/firebase/paths";
 import type { Membership, MembershipWithSociety } from "@/types/membership";
 import type { UserRole } from "@/types/roles";
 import type { Society } from "@/types/society";
+import { getTerminologyConfig } from "./terminology.service";
 
 function normalizeRoles(data: DocumentData): UserRole[] {
   if (Array.isArray(data.roles) && data.roles.length > 0) {
@@ -60,6 +61,8 @@ async function getSocietyById(societyId: string): Promise<Society | null> {
   }
 
   const data = snapshot.data();
+  const terminology = await getTerminologyConfig(societyId);
+
   return {
     id: snapshot.id,
     name: data.name ?? "Unnamed society",
@@ -69,6 +72,7 @@ async function getSocietyById(societyId: string): Promise<Society | null> {
     status: data.status ?? "active",
     planId: data.planId,
     billingStatus: data.billingStatus,
+    terminologyLabels: terminology.labels,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };

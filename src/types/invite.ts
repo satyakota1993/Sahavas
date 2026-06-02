@@ -6,6 +6,7 @@ export type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
 
 export interface SocietyInvite {
   id: string;
+  communityId?: string;
   societyId: string;
   email?: string;
   phoneNumber?: string;

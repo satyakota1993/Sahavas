@@ -12,7 +12,7 @@ export function AuthLayout() {
             </div>
             <div>
               <p className="text-lg font-semibold">Sahavas</p>
-              <p className="text-sm text-white/72">Apartment operations platform</p>
+              <p className="text-sm text-white/72">Community operations platform</p>
             </div>
           </div>
           <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-normal">

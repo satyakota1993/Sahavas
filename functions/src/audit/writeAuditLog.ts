@@ -23,6 +23,11 @@ export function writeSocietyAuditLog(
   const communityAuditRef = getFirestore()
     .collection("communities")
     .doc(input.societyId)
+    .collection("audit_logs")
+    .doc(auditRef.id);
+  const communityAuditCompatibilityRef = getFirestore()
+    .collection("communities")
+    .doc(input.societyId)
     .collection("auditLogs")
     .doc(auditRef.id);
   const auditData = {
@@ -40,4 +45,5 @@ export function writeSocietyAuditLog(
 
   transaction.create(auditRef, auditData);
   transaction.create(communityAuditRef, auditData);
+  transaction.create(communityAuditCompatibilityRef, auditData);
 }

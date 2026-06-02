@@ -17,6 +17,7 @@ export interface Community {
 
 export interface CommunityConfig {
   communityId: string;
+  group: string;
   timezone: string;
   locale: string;
   fiscalYearStartMonth: number;
@@ -26,6 +27,7 @@ export interface CommunityConfig {
 
 export interface BrandingConfig {
   communityId: string;
+  configId: string;
   displayName: string;
   logoUrl?: string;
   primaryColor?: string;
@@ -35,11 +37,27 @@ export interface BrandingConfig {
 
 export interface TerminologyConfig {
   communityId: string;
-  communityLabel: string;
-  unitLabel: string;
-  residentLabel: string;
+  configId: string;
+  labels: TerminologyLabels;
+  hierarchyDepth: number;
+  usesFloors: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+}
+
+export interface TerminologyLabels {
+  community: string;
+  propertyGroup: string;
+  subGroup: string;
+  floor: string;
+  unit: string;
+  resident: string;
+  owner: string;
+  tenant: string;
+  committee: string;
+  parkingSpace: string;
+  facility: string;
+  amenity: string;
 }
 
 export interface CreateCommunityInput {

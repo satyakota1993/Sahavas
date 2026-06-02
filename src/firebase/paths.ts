@@ -11,12 +11,18 @@ export const firestorePaths = {
   communityInvites: (communityId: string) => `communities/${communityId}/invites`,
   communityInvite: (communityId: string, tokenHash: string) =>
     `communities/${communityId}/invites/${tokenHash}`,
-  communityConfigs: "community_configs",
-  communityConfig: (communityId: string) => `community_configs/${communityId}`,
-  brandingConfigs: "branding_configs",
-  brandingConfig: (communityId: string) => `branding_configs/${communityId}`,
-  terminologyConfigs: "terminology_configs",
-  terminologyConfig: (communityId: string) => `terminology_configs/${communityId}`,
+  communityConfigs: (communityId: string) =>
+    `communities/${communityId}/community_configs`,
+  communityConfig: (communityId: string, group = "default") =>
+    `communities/${communityId}/community_configs/${group}`,
+  brandingConfigs: (communityId: string) =>
+    `communities/${communityId}/branding_configs`,
+  brandingConfig: (communityId: string, configId = "default") =>
+    `communities/${communityId}/branding_configs/${configId}`,
+  terminologyConfigs: (communityId: string) =>
+    `communities/${communityId}/terminology_configs`,
+  terminologyConfig: (communityId: string, configId = "default") =>
+    `communities/${communityId}/terminology_configs/${configId}`,
   societies: "societies",
   society: (societyId: string) => `societies/${societyId}`,
   societyMembers: (societyId: string) => `societies/${societyId}/members`,

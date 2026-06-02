@@ -181,24 +181,6 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    match /community_configs/{communityId} {
-      allow get: if hasActiveMembership(communityId);
-      allow list: if isSuperAdmin();
-      allow create, update, delete: if false;
-    }
-
-    match /branding_configs/{communityId} {
-      allow get: if hasActiveMembership(communityId);
-      allow list: if isSuperAdmin();
-      allow create, update, delete: if false;
-    }
-
-    match /terminology_configs/{communityId} {
-      allow get: if hasActiveMembership(communityId);
-      allow list: if isSuperAdmin();
-      allow create, update, delete: if false;
-    }
-
     match /communities/{societyId} {
       allow get: if hasActiveMembership(societyId);
       allow list: if isSuperAdmin();
@@ -217,6 +199,21 @@ service cloud.firestore {
         allow get: if canReadInvite(societyId);
         allow list: if isSocietyAdmin(societyId) ||
           hasCapability(societyId, "invites.read");
+        allow create, update, delete: if false;
+      }
+
+      match /community_configs/{configId} {
+        allow get, list: if hasActiveMembership(societyId);
+        allow create, update, delete: if false;
+      }
+
+      match /branding_configs/{configId} {
+        allow get, list: if hasActiveMembership(societyId);
+        allow create, update, delete: if false;
+      }
+
+      match /terminology_configs/{configId} {
+        allow get, list: if hasActiveMembership(societyId);
         allow create, update, delete: if false;
       }
 
@@ -307,6 +304,12 @@ service cloud.firestore {
       }
 
       match /auditLogs/{auditId} {
+        allow get, list: if isSocietyAdmin(societyId) ||
+          hasCapability(societyId, "audit.read");
+        allow create, update, delete: if false;
+      }
+
+      match /audit_logs/{auditId} {
         allow get, list: if isSocietyAdmin(societyId) ||
           hasCapability(societyId, "audit.read");
         allow create, update, delete: if false;

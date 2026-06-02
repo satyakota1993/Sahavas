@@ -154,25 +154,41 @@ export const createCommunity = onCall<CreateCommunityPayload>(
     await db.runTransaction(async (transaction) => {
       transaction.create(communityRef, communityData);
       transaction.create(societyRef, communityData);
-      transaction.create(db.collection("community_configs").doc(communityId), {
+      transaction.create(communityRef.collection("community_configs").doc("default"), {
         communityId,
+        group: "default",
         timezone: "Asia/Kolkata",
         locale: "en-IN",
         fiscalYearStartMonth: 4,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      transaction.create(db.collection("branding_configs").doc(communityId), {
+      transaction.create(communityRef.collection("branding_configs").doc("default"), {
         communityId,
+        configId: "default",
         displayName: name,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      transaction.create(db.collection("terminology_configs").doc(communityId), {
+      transaction.create(communityRef.collection("terminology_configs").doc("default"), {
         communityId,
-        communityLabel: "Community",
-        unitLabel: "Flat",
-        residentLabel: "Resident",
+        configId: "default",
+        labels: {
+          community: "Community",
+          propertyGroup: "Section",
+          subGroup: "Subsection",
+          floor: "Level",
+          unit: "Residence",
+          resident: "Member",
+          owner: "Owner",
+          tenant: "Tenant",
+          committee: "Committee",
+          parkingSpace: "Parking Space",
+          facility: "Facility",
+          amenity: "Amenity",
+        },
+        hierarchyDepth: 1,
+        usesFloors: true,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
