@@ -392,6 +392,7 @@ export const updateCommunity = onCall<UpdateCommunityPayload>(
     const db = getFirestore();
     const communityRef = db.collection("communities").doc(communityId);
     const societyRef = db.collection("societies").doc(communityId);
+    let resolvedStatus: CommunityMutationResponse["status"] = "trial";
 
     await db.runTransaction(async (transaction) => {
       const communitySnapshot = await transaction.get(communityRef);
@@ -399,6 +400,20 @@ export const updateCommunity = onCall<UpdateCommunityPayload>(
       if (!communitySnapshot.exists) {
         throw new HttpsError("not-found", "Community was not found.");
       }
+
+      const currentStatus = communitySnapshot.data()?.status;
+      resolvedStatus =
+        update.status === "active" ||
+        update.status === "suspended" ||
+        update.status === "archived" ||
+        update.status === "trial"
+          ? update.status
+          : currentStatus === "active" ||
+              currentStatus === "suspended" ||
+              currentStatus === "archived" ||
+              currentStatus === "trial"
+            ? currentStatus
+            : "trial";
 
       transaction.update(communityRef, update);
       transaction.set(societyRef, update, { merge: true });
@@ -417,12 +432,7 @@ export const updateCommunity = onCall<UpdateCommunityPayload>(
 
     return {
       communityId,
-      status:
-        request.data?.status === "active" ||
-        request.data?.status === "suspended" ||
-        request.data?.status === "archived"
-          ? request.data.status
-          : "trial",
+      status: resolvedStatus,
     };
   },
 );

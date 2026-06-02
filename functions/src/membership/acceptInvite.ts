@@ -100,6 +100,16 @@ function membershipDocumentId(uid: string, societyId: string): string {
   return `${uid}_${societyId}`;
 }
 
+function acceptedInvitePatch(actorUid: string, membershipId: string) {
+  return {
+    status: "accepted",
+    acceptedBy: actorUid,
+    acceptedAt: FieldValue.serverTimestamp(),
+    membershipId,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
 export const acceptInvite = onCall<AcceptInvitePayload>(
   callableOptions,
   async (request): Promise<AcceptInviteResponse> => {
@@ -153,9 +163,10 @@ export const acceptInvite = onCall<AcceptInvitePayload>(
       const inviteSnapshot = communityInviteSnapshot.exists
         ? communityInviteSnapshot
         : societyInviteSnapshot;
-      const inviteRef = communityInviteSnapshot.exists
-        ? communityInviteRef
-        : societyInviteRef;
+      const inviteRefsToUpdate = [
+        communityInviteSnapshot.exists ? communityInviteRef : null,
+        societyInviteSnapshot.exists ? societyInviteRef : null,
+      ].filter((ref): ref is FirebaseFirestore.DocumentReference => ref !== null);
 
       if (!inviteSnapshot.exists) {
         throw new HttpsError("not-found", "Invite link was not found.");
@@ -217,13 +228,9 @@ export const acceptInvite = onCall<AcceptInvitePayload>(
       };
 
       if (existingStatus === "active") {
-        transaction.update(inviteRef, {
-          status: "accepted",
-          acceptedBy: actor.uid,
-          acceptedAt: FieldValue.serverTimestamp(),
-          membershipId,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        for (const inviteRef of inviteRefsToUpdate) {
+          transaction.update(inviteRef, acceptedInvitePatch(actor.uid, membershipId));
+        }
 
         writeSocietyAuditLog(transaction, {
           societyId,
@@ -252,13 +259,9 @@ export const acceptInvite = onCall<AcceptInvitePayload>(
         transaction.set(membershipRef, membershipData, { merge: true });
         transaction.set(communityMemberRef, membershipData, { merge: true });
         transaction.set(societyMemberRef, membershipData, { merge: true });
-        transaction.update(inviteRef, {
-          status: "accepted",
-          acceptedBy: actor.uid,
-          acceptedAt: FieldValue.serverTimestamp(),
-          membershipId,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        for (const inviteRef of inviteRefsToUpdate) {
+          transaction.update(inviteRef, acceptedInvitePatch(actor.uid, membershipId));
+        }
 
         writeSocietyAuditLog(transaction, {
           societyId,
@@ -300,13 +303,9 @@ export const acceptInvite = onCall<AcceptInvitePayload>(
       transaction.create(membershipRef, membershipData);
       transaction.create(communityMemberRef, membershipData);
       transaction.create(societyMemberRef, membershipData);
-      transaction.update(inviteRef, {
-        status: "accepted",
-        acceptedBy: actor.uid,
-        acceptedAt: FieldValue.serverTimestamp(),
-        membershipId,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      for (const inviteRef of inviteRefsToUpdate) {
+        transaction.update(inviteRef, acceptedInvitePatch(actor.uid, membershipId));
+      }
 
       writeSocietyAuditLog(transaction, {
         societyId,
